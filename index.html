@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree — Database Model</title>
+    <meta name="description" content="Interactive family tree database schema visualization with ER diagram and sample data tree view.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ============ RESET & VARIABLES ============ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary:    #0a0e1a;
+            --bg-secondary:  #111827;
+            --bg-card:       rgba(17, 24, 39, 0.7);
+            --bg-glass:      rgba(255,255,255,0.04);
+            --border:        rgba(255,255,255,0.08);
+            --border-glow:   rgba(99,102,241,0.35);
+            --text-primary:  #f1f5f9;
+            --text-secondary:#94a3b8;
+            --text-dim:      #64748b;
+            --accent:        #818cf8;
+            --accent2:       #6366f1;
+            --accent3:       #a78bfa;
+            --pk:            #f59e0b;
+            --fk:            #f472b6;
+            --check:         #34d399;
+            --not-null:      #60a5fa;
+            --male:          #60a5fa;
+            --female:        #f472b6;
+            --spouse-line:   #f59e0b;
+            --shadow:        0 8px 32px rgba(0,0,0,0.4);
+            --radius:        16px;
+            --radius-sm:     10px;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background gradient */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 20%, rgba(99,102,241,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 80%, rgba(167,139,250,0.09) 0%, transparent 60%);
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ============ LAYOUT ============ */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative; z-index: 1;
+        }
+
+        /* ============ HEADER ============ */
+        header {
+            padding: 48px 0 32px;
+            text-align: center;
+        }
+        header .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.75rem; font-weight: 600;
+            letter-spacing: 0.06em; text-transform: uppercase;
+            color: var(--accent);
+            background: rgba(99,102,241,0.1);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 999px;
+            padding: 6px 16px;
+            margin-bottom: 16px;
+        }
+        header h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent3) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+        header p {
+            margin-top: 12px;
+            font-size: 1.05rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-left: auto; margin-right: auto;
+        }
+
+        /* ============ TABS ============ */
+        .tabs {
+            display: flex; justify-content: center; gap: 8px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            font-family: inherit;
+            font-size: 0.9rem; font-weight: 500;
+            padding: 10px 24px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tab-btn:hover { border-color: var(--border-glow); color: var(--text-primary); }
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--accent2), var(--accent3));
+            color: #fff; border-color: transparent;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.35);
+        }
+
+        .tab-content { display: none; animation: fadeUp 0.4s ease; }
+        .tab-content.active { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============ ER DIAGRAM SECTION ============ */
+        .er-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .table-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .table-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-glow);
+        }
+
+        .table-card__header {
+            padding: 18px 20px;
+            display: flex; align-items: center; gap: 12px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+        .table-card__icon {
+            width: 40px; height: 40px;
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+        .table-card__icon.persons  { background: rgba(96,165,250,0.15); }
+        .table-card__icon.rels     { background: rgba(244,114,182,0.15); }
+        .table-card__icon.events   { background: rgba(52,211,153,0.15); }
+        .table-card__icon.media    { background: rgba(245,158,11,0.15); }
+
+        .table-card__name {
+            font-size: 1.05rem; font-weight: 700;
+            color: var(--text-primary);
+        }
+        .table-card__subtitle {
+            font-size: 0.75rem; color: var(--text-dim);
+        }
+
+        .table-card__body { padding: 0; }
+
+        .col-row {
+            display: grid;
+            grid-template-columns: 140px 1fr auto;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+        .col-row:hover { background: rgba(255,255,255,0.03); }
+        .col-row:last-child { border-bottom: none; }
+
+        .col-name {
+            font-weight: 500;
+            color: var(--text-primary);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .col-type { color: var(--text-dim); font-family: 'Courier New', monospace; font-size: 0.8rem; }
+
+        .col-badges { display: flex; gap: 4px; justify-content: flex-end; }
+        .badge-sm {
+            font-size: 0.6rem; font-weight: 700;
+            padding: 2px 7px; border-radius: 4px;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .badge-pk    { background: rgba(245,158,11,0.15); color: var(--pk); }
+        .badge-fk    { background: rgba(244,114,182,0.15); color: var(--fk); }
+        .badge-nn    { background: rgba(96,165,250,0.12); color: var(--not-null); }
+        .badge-check { background: rgba(52,211,153,0.12); color: var(--check); }
+        .badge-uq    { background: rgba(167,139,250,0.12); color: var(--accent3); }
+
+        /* ============ RELATIONSHIPS DIAGRAM ============ */
+        .rel-section {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 48px;
+        }
+        .rel-section h3 {
+            font-size: 1.1rem; font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .rel-list { display: flex; flex-direction: column; gap: 12px; }
+        .rel-item {
+            display: flex; align-items: center; gap: 16px;
+            padding: 14px 20px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            transition: border-color 0.3s;
+        }
+        .rel-item:hover { border-color: var(--border-glow); }
+
+        .rel-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .rel-dot.one  { background: var(--male); }
+        .rel-dot.many { background: var(--fk); }
+
+        .rel-text { font-size: 0.9rem; color: var(--text-secondary); }
+        .rel-text strong { color: var(--text-primary); font-weight: 600; }
+        .rel-arrow { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+        /* ============ FAMILY TREE TAB ============ */
+        .tree-container {
+            width: 100%;
+            overflow-x: auto;
+            padding: 32px 0 48px;
+        }
+
+        .tree-svg-wrapper {
+            display: flex;
+            justify-content: center;
+            min-width: 800px;
+        }
+
+        svg.family-tree {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* ============ LEGEND ============ */
+        .legend {
+            display: flex; flex-wrap: wrap; gap: 16px;
+            justify-content: center;
+            margin: 24px auto 0;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            max-width: 600px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary); }
+        .legend-dot  { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* ============ SQL TAB ============ */
+        .sql-section {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 48px;
+        }
+        .sql-header {
+            padding: 16px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+        .sql-header span { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+        .copy-btn {
+            font-family: inherit; font-size: 0.8rem; font-weight: 500;
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .copy-btn.copied { border-color: var(--check); color: var(--check); }
+
+        pre.sql-code {
+            padding: 24px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            white-space: pre;
+        }
+        pre.sql-code .kw   { color: var(--accent); font-weight: 600; }
+        pre.sql-code .type { color: var(--check); }
+        pre.sql-code .str  { color: var(--pk); }
+        pre.sql-code .cmt  { color: var(--text-dim); font-style: italic; }
+        pre.sql-code .fn   { color: var(--fk); }
+
+        /* ============ FOOTER ============ */
+        footer {
+            text-align: center;
+            padding: 32px 0;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 640px) {
+            .col-row { grid-template-columns: 120px 1fr; gap: 4px; }
+            .col-badges { grid-column: 1 / -1; justify-content: flex-start; margin-top: 4px; }
+            .rel-item { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="badge">🌳 Database Design</div>
+        <h1>Family Tree Model</h1>
+        <p>An interactive visualization of a relational database schema designed to store and query multi-generational family data.</p>
+    </header>
+
+    <!-- TABS -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="er"    id="tab-er">ER Diagram</button>
+        <button class="tab-btn"        data-tab="tree"  id="tab-tree">Family Tree</button>
+        <button class="tab-btn"        data-tab="sql"   id="tab-sql">SQL Schema</button>
+    </div>
+
+    <!-- ===== TAB 1: ER DIAGRAM ===== -->
+    <div class="tab-content active" id="er">
+
+        <div class="er-grid">
+
+            <!-- PERSONS -->
+            <div class="table-card">
+                <div class="table-card__header">
+                    <div class="table-card__icon persons">👤</div>
+                    <div>
+                        <div class="table-card__name">persons</div>
+                        <div class="table-card__subtitle">Core individuals</div>
+                    </div>
+                </div>
+                <div class="table-card__body">
+                    <div class="col-row"><span class="col-name">id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-pk">PK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">first_name</span><span class="col-type">VARCHAR(100)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">last_name</span><span class="col-type">VARCHAR(100)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">maiden_name</span><span class="col-type">VARCHAR(100)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">gender</span><span class="col-type">VARCHAR(10)</span><span class="col-badges"><span class="badge-sm badge-check">CHK</span></span></div>
+                    <div class="col-row"><span class="col-name">date_of_birth</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">place_of_birth</span><span class="col-type">VARCHAR(255)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">date_of_death</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">place_of_death</span><span class="col-type">VARCHAR(255)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">bio</span><span class="col-type">TEXT</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">photo_url</span><span class="col-type">VARCHAR(500)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">created_at</span><span class="col-type">DATETIME</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">updated_at</span><span class="col-type">DATETIME</span><span class="col-badges"></span></div>
+                </div>
+            </div>
+
+            <!-- RELATIONSHIPS -->
+            <div class="table-card">
+                <div class="table-card__header">
+                    <div class="table-card__icon rels">🔗</div>
+                    <div>
+                        <div class="table-card__name">relationships</div>
+                        <div class="table-card__subtitle">Person ↔ Person links</div>
+                    </div>
+                </div>
+                <div class="table-card__body">
+                    <div class="col-row"><span class="col-name">id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-pk">PK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">person1_id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-fk">FK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">person2_id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-fk">FK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">relationship_type</span><span class="col-type">VARCHAR(20)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span><span class="badge-sm badge-check">CHK</span></span></div>
+                    <div class="col-row"><span class="col-name">start_date</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">end_date</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">notes</span><span class="col-type">TEXT</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">created_at</span><span class="col-type">DATETIME</span><span class="col-badges"></span></div>
+                </div>
+            </div>
+
+            <!-- EVENTS -->
+            <div class="table-card">
+                <div class="table-card__header">
+                    <div class="table-card__icon events">📅</div>
+                    <div>
+                        <div class="table-card__name">events</div>
+                        <div class="table-card__subtitle">Life milestones</div>
+                    </div>
+                </div>
+                <div class="table-card__body">
+                    <div class="col-row"><span class="col-name">id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-pk">PK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">person_id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-fk">FK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">event_type</span><span class="col-type">VARCHAR(50)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span><span class="badge-sm badge-check">CHK</span></span></div>
+                    <div class="col-row"><span class="col-name">event_date</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">event_place</span><span class="col-type">VARCHAR(255)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">description</span><span class="col-type">TEXT</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">created_at</span><span class="col-type">DATETIME</span><span class="col-badges"></span></div>
+                </div>
+            </div>
+
+            <!-- MEDIA -->
+            <div class="table-card">
+                <div class="table-card__header">
+                    <div class="table-card__icon media">🖼️</div>
+                    <div>
+                        <div class="table-card__name">media</div>
+                        <div class="table-card__subtitle">Photos & documents</div>
+                    </div>
+                </div>
+                <div class="table-card__body">
+                    <div class="col-row"><span class="col-name">id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-pk">PK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">person_id</span><span class="col-type">INTEGER</span><span class="col-badges"><span class="badge-sm badge-fk">FK</span><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">media_type</span><span class="col-type">VARCHAR(20)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span><span class="badge-sm badge-check">CHK</span></span></div>
+                    <div class="col-row"><span class="col-name">file_url</span><span class="col-type">VARCHAR(500)</span><span class="col-badges"><span class="badge-sm badge-nn">NN</span></span></div>
+                    <div class="col-row"><span class="col-name">title</span><span class="col-type">VARCHAR(255)</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">description</span><span class="col-type">TEXT</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">date_taken</span><span class="col-type">DATE</span><span class="col-badges"></span></div>
+                    <div class="col-row"><span class="col-name">created_at</span><span class="col-type">DATETIME</span><span class="col-badges"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RELATIONSHIP LINES -->
+        <div class="rel-section">
+            <h3>🔗 Table Relationships</h3>
+            <div class="rel-list">
+                <div class="rel-item">
+                    <div class="rel-dot one"></div>
+                    <strong style="color:var(--male)">persons</strong>
+                    <span class="rel-arrow">1 ──── ∞</span>
+                    <strong style="color:var(--fk)">relationships</strong>
+                    <span class="rel-text">One person appears in many relationships (as person1 or person2)</span>
+                </div>
+                <div class="rel-item">
+                    <div class="rel-dot one"></div>
+                    <strong style="color:var(--male)">persons</strong>
+                    <span class="rel-arrow">1 ──── ∞</span>
+                    <strong style="color:var(--check)">events</strong>
+                    <span class="rel-text">One person has many life events</span>
+                </div>
+                <div class="rel-item">
+                    <div class="rel-dot one"></div>
+                    <strong style="color:var(--male)">persons</strong>
+                    <span class="rel-arrow">1 ──── ∞</span>
+                    <strong style="color:var(--pk)">media</strong>
+                    <span class="rel-text">One person has many attached media files</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEGEND -->
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:var(--pk)"></span>PK — Primary Key</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--fk)"></span>FK — Foreign Key</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--not-null)"></span>NN — Not Null</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--check)"></span>CHK — Check Constraint</div>
+            <div class="legend-item"><span class="legend-dot" style="background:var(--accent3)"></span>UQ — Unique</div>
+        </div>
+    </div>
+
+    <!-- ===== TAB 2: FAMILY TREE ===== -->
+    <div class="tab-content" id="tree">
+        <div class="tree-container">
+            <div class="tree-svg-wrapper">
+                <svg class="family-tree" width="860" height="520" viewBox="0 0 860 520">
+                    <defs>
+                        <linearGradient id="maleGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#1e3a5f"/>
+                            <stop offset="100%" stop-color="#1e293b"/>
+                        </linearGradient>
+                        <linearGradient id="femaleGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#4a1942"/>
+                            <stop offset="100%" stop-color="#1e293b"/>
+                        </linearGradient>
+                        <linearGradient id="deceasedGrad" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#292524"/>
+                            <stop offset="100%" stop-color="#1c1917"/>
+                        </linearGradient>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3" result="blur"/>
+                            <feMerge>
+                                <feMergeNode in="blur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                    </defs>
+
+                    <!-- ── CONNECTORS ── -->
+                    <!-- Spouse lines (dashed gold) -->
+                    <line x1="340" y1="75" x2="520" y2="75" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4" opacity="0.6"/>
+                    <line x1="290" y1="275" x2="470" y2="275" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4" opacity="0.6"/>
+
+                    <!-- Parent-to-child vertical lines -->
+                    <!-- Grandparents → generation bar -->
+                    <line x1="430" y1="110" x2="430" y2="155" stroke="#475569" stroke-width="1.5"/>
+                    <!-- Horizontal bar for gen 2 -->
+                    <line x1="230" y1="155" x2="630" y2="155" stroke="#475569" stroke-width="1.5"/>
+                    <!-- Drop lines to gen 2 -->
+                    <line x1="230" y1="155" x2="230" y2="230" stroke="#475569" stroke-width="1.5"/>
+                    <line x1="630" y1="155" x2="630" y2="230" stroke="#475569" stroke-width="1.5"/>
+
+                    <!-- Parents → generation bar for gen 3 -->
+                    <line x1="380" y1="310" x2="380" y2="355" stroke="#475569" stroke-width="1.5"/>
+                    <!-- Horizontal bar for gen 3 -->
+                    <line x1="280" y1="355" x2="580" y2="355" stroke="#475569" stroke-width="1.5"/>
+                    <!-- Drop lines to gen 3 -->
+                    <line x1="280" y1="355" x2="280" y2="420" stroke="#475569" stroke-width="1.5"/>
+                    <line x1="580" y1="355" x2="580" y2="420" stroke="#475569" stroke-width="1.5"/>
+
+                    <!-- ── GENERATION 1: GRANDPARENTS ── -->
+                    <g class="person-node" transform="translate(250,35)">
+                        <rect width="170" height="80" rx="12" fill="url(#deceasedGrad)" stroke="#78716c" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#e7e5e4" font-size="14" font-weight="600">James Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#a8a29e" font-size="11">1940 – 2015</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#78716c" font-size="10">♂ Grandfather</text>
+                    </g>
+
+                    <g class="person-node" transform="translate(440,35)">
+                        <rect width="170" height="80" rx="12" fill="url(#femaleGrad)" stroke="#f472b6" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#fce7f3" font-size="14" font-weight="600">Margaret Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#f9a8d4" font-size="11">b. 1942</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#ec4899" font-size="10">♀ Grandmother</text>
+                    </g>
+
+                    <text x="430" y="72" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="500">💍 1963</text>
+
+                    <!-- ── GENERATION 2: PARENTS & AUNT ── -->
+                    <g class="person-node" transform="translate(145,230)">
+                        <rect width="170" height="80" rx="12" fill="url(#maleGrad)" stroke="#60a5fa" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="600">Robert Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#93c5fd" font-size="11">b. 1965</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#3b82f6" font-size="10">♂ Father</text>
+                    </g>
+
+                    <g class="person-node" transform="translate(385,230)">
+                        <rect width="170" height="80" rx="12" fill="url(#femaleGrad)" stroke="#f472b6" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#fce7f3" font-size="14" font-weight="600">Linda Johnson</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#f9a8d4" font-size="11">b. 1967</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#ec4899" font-size="10">♀ Mother</text>
+                    </g>
+
+                    <text x="380" y="272" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="500">💍 1990</text>
+
+                    <g class="person-node" transform="translate(545,230)">
+                        <rect width="170" height="80" rx="12" fill="url(#femaleGrad)" stroke="#f472b6" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#fce7f3" font-size="14" font-weight="600">Susan Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#f9a8d4" font-size="11">b. 1968</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#ec4899" font-size="10">♀ Aunt</text>
+                    </g>
+
+                    <!-- ── GENERATION 3: GRANDCHILDREN ── -->
+                    <g class="person-node" transform="translate(195,420)">
+                        <rect width="170" height="80" rx="12" fill="url(#femaleGrad)" stroke="#f472b6" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#fce7f3" font-size="14" font-weight="600">Emily Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#f9a8d4" font-size="11">b. 1993</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#ec4899" font-size="10">♀ Daughter</text>
+                    </g>
+
+                    <g class="person-node" transform="translate(495,420)">
+                        <rect width="170" height="80" rx="12" fill="url(#maleGrad)" stroke="#60a5fa" stroke-width="1.5"/>
+                        <text x="85" y="28" text-anchor="middle" fill="#dbeafe" font-size="14" font-weight="600">Michael Smith</text>
+                        <text x="85" y="47" text-anchor="middle" fill="#93c5fd" font-size="11">b. 1996</text>
+                        <text x="85" y="65" text-anchor="middle" fill="#3b82f6" font-size="10">♂ Son</text>
+                    </g>
+
+                    <!-- Generation labels -->
+                    <text x="50" y="80" fill="#475569" font-size="11" font-weight="600" transform="rotate(-90, 50, 80)">Gen 1</text>
+                    <text x="50" y="275" fill="#475569" font-size="11" font-weight="600" transform="rotate(-90, 50, 275)">Gen 2</text>
+                    <text x="50" y="465" fill="#475569" font-size="11" font-weight="600" transform="rotate(-90, 50, 465)">Gen 3</text>
+                </svg>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#60a5fa"></span>Male</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#f472b6"></span>Female</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#78716c"></span>Deceased</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Marriage link</div>
+        </div>
+    </div>
+
+    <!-- ===== TAB 3: SQL SCHEMA ===== -->
+    <div class="tab-content" id="sql">
+        <div class="sql-section">
+            <div class="sql-header">
+                <span>schema.sql</span>
+                <button class="copy-btn" id="copyBtn" onclick="copySQL()">📋 Copy</button>
+            </div>
+            <pre class="sql-code" id="sqlCode"></pre>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    <div class="container">Family Tree Database Model &middot; Built with ❤️</div>
+</footer>
+
+<script>
+    // ── Tab switching ──
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // ── SQL syntax highlighted preview ──
+    const rawSQL = `-- ============================================================
+-- Family Tree Database Schema
+-- ============================================================
+
+CREATE TABLE persons (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name      VARCHAR(100)  NOT NULL,
+    last_name       VARCHAR(100)  NOT NULL,
+    maiden_name     VARCHAR(100),
+    gender          VARCHAR(10)   CHECK (gender IN ('male', 'female', 'other')),
+    date_of_birth   DATE,
+    place_of_birth  VARCHAR(255),
+    date_of_death   DATE,
+    place_of_death  VARCHAR(255),
+    bio             TEXT,
+    photo_url       VARCHAR(500),
+    created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE relationships (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    person1_id      INTEGER       NOT NULL,
+    person2_id      INTEGER       NOT NULL,
+    relationship_type VARCHAR(20) NOT NULL
+                    CHECK (relationship_type IN ('parent_child', 'spouse', 'sibling', 'adopted')),
+    start_date      DATE,
+    end_date        DATE,
+    notes           TEXT,
+    created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (person1_id) REFERENCES persons(id) ON DELETE CASCADE,
+    FOREIGN KEY (person2_id) REFERENCES persons(id) ON DELETE CASCADE,
+    UNIQUE (person1_id, person2_id, relationship_type)
+);
+
+CREATE TABLE events (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id       INTEGER       NOT NULL,
+    event_type      VARCHAR(50)   NOT NULL
+                    CHECK (event_type IN ('birth', 'death', 'marriage', 'divorce',
+                                          'graduation', 'immigration', 'other')),
+    event_date      DATE,
+    event_place     VARCHAR(255),
+    description     TEXT,
+    created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE media (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id       INTEGER       NOT NULL,
+    media_type      VARCHAR(20)   NOT NULL
+                    CHECK (media_type IN ('photo', 'document', 'video', 'audio')),
+    file_url        VARCHAR(500)  NOT NULL,
+    title           VARCHAR(255),
+    description     TEXT,
+    date_taken      DATE,
+    created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX idx_persons_name   ON persons (last_name, first_name);
+CREATE INDEX idx_rel_person1    ON relationships (person1_id);
+CREATE INDEX idx_rel_person2    ON relationships (person2_id);
+CREATE INDEX idx_rel_type       ON relationships (relationship_type);
+CREATE INDEX idx_events_person  ON events (person_id);
+CREATE INDEX idx_events_type    ON events (event_type);
+CREATE INDEX idx_media_person   ON media (person_id);`;
+
+    function highlightSQL(sql) {
+        // Escape HTML
+        let s = sql.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        // Comments
+        s = s.replace(/(--.*)/g, '<span class="cmt">$1</span>');
+
+        // Strings
+        s = s.replace(/'([^']*)'/g, "'<span class=\"str\">$1</span>'");
+
+        // Keywords
+        const kw = ['CREATE\\s+TABLE','CREATE\\s+INDEX','INSERT\\s+INTO','VALUES',
+                     'PRIMARY\\s+KEY','AUTOINCREMENT','NOT\\s+NULL','DEFAULT',
+                     'FOREIGN\\s+KEY','REFERENCES','ON\\s+DELETE\\s+CASCADE',
+                     'CHECK','UNIQUE','IN','NULL','ON','IF','EXISTS'];
+        kw.forEach(k => {
+            s = s.replace(new RegExp('\\b(' + k + ')\\b', 'gi'), '<span class="kw">$1</span>');
+        });
+
+        // Types
+        const types = ['INTEGER','VARCHAR','DATE','DATETIME','TEXT','BOOLEAN'];
+        types.forEach(t => {
+            s = s.replace(new RegExp('\\b(' + t + ')\\b', 'g'), '<span class="type">$1</span>');
+        });
+
+        // Functions
+        s = s.replace(/\b(CURRENT_TIMESTAMP)\b/g, '<span class="fn">$1</span>');
+
+        return s;
+    }
+
+    document.getElementById('sqlCode').innerHTML = highlightSQL(rawSQL);
+
+    // ── Copy SQL ──
+    function copySQL() {
+        navigator.clipboard.writeText(rawSQL).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = '✅ Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = '📋 Copy';
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    // ── Animate person nodes on scroll ──
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                e.target.style.opacity = '1';
+                e.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.table-card, .rel-item').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(20px)';
+        el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        observer.observe(el);
+    });
+</script>
+
+</body>
+</html>
